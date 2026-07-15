@@ -2,7 +2,7 @@
 // GET /api/mock-pay-page?trade_no=xxx&amount=19.90
 // 仅当未配置 PayJS 时使用
 
-import { mockPaySuccess } from './_payjs.js';
+import { mockPaySuccess } from './_xorpay.js';
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();

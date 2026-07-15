@@ -120,7 +120,7 @@ const server = http.createServer(async (req, res) => {
   // ===== 支付宝当面付 =====
   if (pathname === '/api/checkout' && req.method === 'POST') {
     try {
-      const { createPayJSOrder } = await import('./api/_payjs.js');
+      const { createXorPayOrder } = await import('./api/_xorpay.js');
       const { plan } = await parseBody(req);
 
       const plans = {
@@ -136,7 +136,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       const outTradeNo = "PF" + Date.now().toString(36) + Math.random().toString(36).slice(2,6).toUpperCase();
-      const result = await createPayJSOrder({
+      const result = await createXorPayOrder({
         subject: "PixelForge AI - " + selected.name + "套餐",
         totalAmount: selected.price,
         outTradeNo,
@@ -169,7 +169,7 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(400, { "Content-Type": "application/json" });
         return res.end(JSON.stringify({ error: "缺少订单号" }));
       }
-      const { getDevOrderStatus } = await import('./api/_payjs.js');
+      const { getDevOrderStatus } = await import('./api/_xorpay.js');
       const result = getDevOrderStatus(tradeNo);
       if (!result) {
         res.writeHead(404, { "Content-Type": "application/json" });
@@ -198,7 +198,7 @@ const server = http.createServer(async (req, res) => {
 
     // Handle payment action first
     if (action === 'pay' && tradeNo) {
-      const { mockPaySuccess } = await import('./api/_payjs.js');
+      const { mockPaySuccess } = await import('./api/_xorpay.js');
       const ok = mockPaySuccess(tradeNo);
       res.writeHead(200, { "Content-Type": "application/json" });
       return res.end(JSON.stringify({ ok }));

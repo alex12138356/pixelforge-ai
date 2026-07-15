@@ -7,7 +7,7 @@
 //
 // 未配置时自动进入开发模式（显示模拟二维码）
 
-import { createPayJSOrder, queryPayJSOrder } from './_payjs.js';
+import { createXorPayOrder, queryXorPayOrder } from './_xorpay.js';
 
 // 价格定义 (人民币 元)
 const PLANS = {
@@ -39,10 +39,10 @@ export default async function handler(req, res) {
     const body = `PixelForge AI - ${selected.name}套餐`;
 
     // 调用 PayJS API 生成二维码
-    const result = await createPayJSOrder({
-      totalFee: selected.fee,
+    const result = await createXorPayOrder({
+      totalFee: selected.priceCN,
       outTradeNo,
-      body,
+      body: body,
       notifyUrl: process.env.PAYJS_NOTIFY_URL || `${req.headers.origin || 'https://pixelforge-ai.vercel.app'}/api/check-order`,
     });
 

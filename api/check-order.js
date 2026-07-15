@@ -2,7 +2,7 @@
 // GET /api/check-order?trade_no=xxx
 // 前端轮询此接口判断用户是否已付款
 
-import { queryPayJSOrder, getDevOrderStatus } from './_payjs.js';
+import { queryXorPayOrder, getDevOrderStatus } from './_xorpay.js';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -22,7 +22,7 @@ export default async function handler(req, res) {
       result = getDevOrderStatus(tradeNo);
       if (!result) return res.status(404).json({ error: '订单不存在' });
     } else {
-      result = await queryPayJSOrder(tradeNo);
+      result = await queryXorPayOrder(tradeNo);
     }
 
     res.status(200).json({
