@@ -22,7 +22,7 @@ var params = new URLSearchParams(window.location.search);
 document.getElementById('amount').textContent = '\u00a5' + (params.get('amount') || '0.00');
 document.getElementById('orderInfo').textContent = '订单号: ' + (params.get('trade_no') || '--');
 function pay(){
-  fetch('/api/mock-pay?trade_no=' + params.get('trade_no'))
+  fetch('/api/mock-pay-page?action=pay&trade_no=' + params.get('trade_no'))
     .then(function(r){return r.json()})
     .then(function(d){
       document.querySelector('.card').innerHTML = '<div style="font-size:64px">&#x2705;</div><h2>支付成功!</h2><p style="color:#666">3秒后自动关闭，请返回原页面</p>';

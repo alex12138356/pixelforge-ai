@@ -193,22 +193,21 @@ const server = http.createServer(async (req, res) => {
 
   // ===== 开发模式：模拟支付页面 =====
   if (pathname === '/api/mock-pay-page') {
+    const action = url.searchParams.get("action");
     const tradeNo = url.searchParams.get("trade_no");
-    const amount = url.searchParams.get("amount");
+
+    // Handle payment action first
+    if (action === 'pay' && tradeNo) {
+      const { mockPaySuccess } = await import('./api/_payjs.js');
+      const ok = mockPaySuccess(tradeNo);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({ ok }));
+    }
+
+    // Otherwise serve the static HTML page
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
     const mockFile = path.join(__dirname, "mock-pay.html");
-    let mockContent = fs.readFileSync(mockFile, "utf-8");
-    return res.end(mockContent);
-  }
-
-  // ===== 开发模式：模拟支付成功 =====
-  if (pathname === '/api/mock-pay') {
-    const tradeNo = url.searchParams.get("trade_no");
-    const { mockPaySuccess } = await import('./api/_payjs.js');
-    const ok = mockPaySuccess(tradeNo);
-    res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ ok }));
-    return;
+    return res.end(fs.readFileSync(mockFile, "utf-8"));
   }
 
   // ===== Auth API =====
