@@ -1,11 +1,8 @@
 // Vercel Serverless Function — OpenAI DALL-E 3 image generation
-// Deploy on Vercel free tier: https://vercel.com
-// Cost: ~$0.04–$0.08 per image via DALL-E 3
-
-const fetch = (url, opts) => import('node-fetch').then(m => m.default(url, opts));
+// Vercel uses Node 18+ which has native fetch() — no import needed
 
 export default async function handler(req, res) {
-  // CORS headers — allow your frontend domain
+  // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -20,10 +17,9 @@ export default async function handler(req, res) {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) return res.status(500).json({ error: '服务器未配置 API Key' });
 
-    // Build an enhanced prompt
+    // Build an enhanced prompt using the user's inputs
     const enhanced = `${prompt}. Style: ${style || 'modern'}, purpose: ${type || 'thumbnail'}, professional, high quality, suitable for commercial use, no watermark, no text unless specified. 4K quality, detailed, well-composed.`;
 
-    // Free / cheaper alternative: use DALL-E 2 ($0.02/image) instead of DALL-E 3 ($0.04-0.08)
     const model = process.env.MODEL || 'dall-e-3';
     const size = model === 'dall-e-3' ? '1024x1024' : '512x512';
 

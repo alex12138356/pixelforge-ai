@@ -1,0 +1,18 @@
+{
+  "name": "pixelforge-ai-studio",
+  "version": "1.0.0",
+  "description": "PixelForge AI Studio - AI content creation SaaS platform",
+  "type": "module",
+  "scripts": {
+    "dev": "node dev-server.js",
+    "test:generate": "node test-generate.js",
+    "deploy": "echo 'Deploy to Vercel from GitHub repo'"
+  },
+  "dependencies": {
+    "stripe": "^17.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "license": "MIT"
+}
