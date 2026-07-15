@@ -5,6 +5,10 @@
     }
   },
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/$1" }
-  ]
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
+    }
+  ],
+  "installCommand": "pnpm install --no-frozen-lockfile"
 }
