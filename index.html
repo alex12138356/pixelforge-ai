@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="api-base" content="/api">
-<title>PixelForge AI Studio — AI Content Creation Platform</title>
+<title>PixelForge AI Studio — AI 内容创作平台</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 
@@ -173,6 +173,34 @@
   .toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--surface2); border: 1px solid var(--border); padding: 12px 24px; border-radius: var(--radius); font-size: 14px; opacity: 0; transition: all 0.35s; z-index: 400; backdrop-filter: blur(12px); }
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
+  /* Auth Modal Styles */
+  .auth-switch { font-size: 13px; color: var(--text2); text-align: center; margin-top: 16px; }
+  .auth-switch a { color: var(--accent2); cursor: pointer; text-decoration: none; font-weight: 500; }
+  .auth-switch a:hover { color: var(--accent); }
+  .auth-input { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; color: var(--text); font-family: inherit; font-size: 14px; padding: 12px 16px; outline: none; transition: border-color 0.2s; margin-bottom: 12px; }
+  .auth-input:focus { border-color: var(--accent); }
+  .auth-error { color: var(--red); font-size: 13px; margin-bottom: 12px; display: none; }
+  .auth-modal .modal { max-width: 420px; }
+  .auth-form { padding: 8px 0; }
+  .auth-form h2 { font-size: 24px; font-weight: 700; margin-bottom: 4px; }
+  .auth-form .sub { color: var(--text2); font-size: 14px; margin-bottom: 24px; }
+  .user-menu { display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 4px 10px; border: 1px solid var(--border); border-radius: var(--radius2); transition: border-color 0.2s; }
+  .user-menu:hover { border-color: var(--accent); }
+  .user-avatar { width: 24px; height: 24px; border-radius: 50%; background: var(--gradient); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: white; }
+  .user-name { font-size: 13px; font-weight: 500; color: var(--text); max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .user-arrow { font-size: 10px; color: var(--text2); }
+  .user-dropdown { position: absolute; top: 100%; right: 0; margin-top: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); min-width: 180px; box-shadow: 0 8px 40px rgba(0,0,0,.4); display: none; z-index: 200; }
+  .user-dropdown.show { display: block; }
+  .user-dropdown .item { padding: 10px 16px; font-size: 13px; color: var(--text2); cursor: pointer; transition: background 0.2s; display: flex; align-items: center; gap: 8px; }
+  .user-dropdown .item:hover { background: var(--surface2); color: var(--text); }
+  .user-dropdown .divider { height: 1px; background: var(--border); margin: 4px 0; }
+  .usage-badge { display: inline-flex; align-items: center; gap: 4px; background: rgba(108,92,231,0.12); border-radius: 100px; padding: 3px 10px; font-size: 12px; color: var(--accent2); cursor: pointer; transition: background 0.2s; }
+  .usage-badge:hover { background: rgba(108,92,231,0.2); }
+  .usage-bar { width: 100%; height: 4px; background: var(--surface2); border-radius: 4px; overflow: hidden; margin: 4px 0 8px; }
+  .usage-bar-fill { height: 100%; background: var(--gradient); border-radius: 4px; transition: width 0.5s; }
+  .modal .close-icon { position: absolute; top: 16px; right: 16px; background: var(--surface2); border: 1px solid var(--border); color: var(--text); width: 32px; height: 32px; border-radius: 8px; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.2s; z-index: 10; }
+  .modal .close-icon:hover { background: var(--surface3); }
+
   @media (max-width: 768px) {
     .hero { padding: 120px 20px 60px; }
     .stats-bar { gap: 28px; flex-wrap: wrap; }
@@ -193,7 +221,23 @@
     <a class="nav-link" href="#gallery">作品集</a>
     <a class="nav-link" href="#pricing">定价</a>
     <a class="nav-link" href="#generator">在线生成器</a>
-    <button class="nav-cta" onclick="document.getElementById('generator').scrollIntoView({behavior:'smooth'})">开始创作</button>
+    <div id="authNav">
+      <button class="nav-cta" onclick="document.getElementById('generator').scrollIntoView({behavior:'smooth'})">开始创作</button>
+    </div>
+    <div id="userNav" style="display:none;position:relative">
+      <span class="usage-badge" id="usageBadge"><span id="usageCount">0</span>/<span id="usageLimit">3</span></span>
+      <div class="user-menu" id="userMenu" onclick="toggleDropdown(event)">
+        <div class="user-avatar" id="userAvatar">U</div>
+        <span class="user-name" id="userName">用户</span>
+        <span class="user-arrow">&#x25BE;</span>
+      </div>
+      <div class="user-dropdown" id="userDropdown">
+        <div class="item">&#x1F4CA; 使用量: <span id="dropUsage">0/3</span></div>
+        <div class="item">&#x1F4B3; 套餐: <span id="dropPlan">免费</span></div>
+        <div class="divider"></div>
+        <div class="item" onclick="handleLogout()">&#x1F6AA; 退出登录</div>
+      </div>
+    </div>
   </div>
 </nav>
 
@@ -341,6 +385,33 @@
   <p>PixelForge AI Studio — 用 AI 放大你的创造力 & 变现力</p>
   <p style="margin-top:6px;">&copy; 2026 PixelForge. All rights reserved.</p>
 </footer>
+
+<div class="modal-overlay" id="authOverlay" onclick="if(event.target===this)closeAuthModal()">
+  <div class="modal auth-modal" style="max-width:420px">
+    <button class="close-icon" onclick="closeAuthModal()">&#x2715;</button>
+    <div class="modal-body">
+      <div class="auth-form" id="loginForm">
+        <h2>登录</h2>
+        <p class="sub">登录你的 PixelForge 账号</p>
+        <input class="auth-input" id="loginEmail" type="email" placeholder="邮箱地址" autocomplete="email">
+        <input class="auth-input" id="loginPassword" type="password" placeholder="密码" autocomplete="current-password">
+        <div class="auth-error" id="loginError"></div>
+        <button class="btn-primary" style="width:100%" onclick="handleLogin()">登录</button>
+        <p class="auth-switch">还没有账号？<a onclick="showRegisterForm()">注册</a></p>
+      </div>
+      <div class="auth-form" id="registerForm" style="display:none">
+        <h2>注册</h2>
+        <p class="sub">免费创建 PixelForge 账号，立即开始 AI 创作</p>
+        <input class="auth-input" id="regName" type="text" placeholder="昵称 (可选)" autocomplete="name">
+        <input class="auth-input" id="regEmail" type="email" placeholder="邮箱地址" autocomplete="email">
+        <input class="auth-input" id="regPassword" type="password" placeholder="密码 (至少 6 位)" autocomplete="new-password">
+        <div class="auth-error" id="regError"></div>
+        <button class="btn-primary" style="width:100%" onclick="handleRegister()">免费注册</button>
+        <p class="auth-switch">已有账号？<a onclick="showLoginForm()">登录</a></p>
+      </div>
+    </div>
+  </div>
+</div>
 
 <div class="toast" id="toast"></div>
 
@@ -520,9 +591,12 @@ function handleGen(e) {
   var apiBase = meta ? meta.getAttribute('content') : '/api';
 
   // Try real API first
+  var genHeaders = { 'Content-Type': 'application/json' };
+  if (AUTH_TOKEN) genHeaders['Authorization'] = 'Bearer ' + AUTH_TOKEN;
+
   fetch(apiBase + '/generate', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: genHeaders,
     body: JSON.stringify({ prompt: prompt, style: style, type: type })
   })
   .then(function(r){ return r.json(); })
@@ -533,6 +607,16 @@ function handleGen(e) {
       document.getElementById('genCaption').textContent = '「'+prompt.slice(0,60)+'」— '+style+'风格 · '+type+' · AI 生成';
       result.classList.add('show');
       showToast('AI 作品已生成！点击下载保存');
+      // Refresh user quota after generation
+      if (AUTH_TOKEN) {
+        fetch(apiBase + '/auth?action=me', { headers: { 'Authorization': 'Bearer ' + AUTH_TOKEN } })
+          .then(function(r){ return r.json(); })
+          .then(function(d){
+            if (d.user) { CURRENT_USER = d.user; localStorage.setItem('pf_user', JSON.stringify(d.user)); updateAuthUI(); }
+          });
+      }
+    } else if (data.code === 'quota_exceeded') {
+      showToast('本月生成次数已用完，请升级套餐');
     } else {
       throw new Error('no image');
     }
@@ -561,6 +645,7 @@ function handleGen(e) {
 // INIT
 // ============================================================
 initGallery();
+checkStoredAuth();
 
 // Wire up pricing buttons
 document.addEventListener('DOMContentLoaded', function() {
@@ -575,6 +660,203 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Welcome toast
 setTimeout(function(){ showToast('欢迎体验！试试下方的在线生成器，亲手创造可售卖的作品'); }, 600);
+
+// ============================================================
+// AUTH SYSTEM — Login/Register/User State
+// ============================================================
+
+var AUTH_TOKEN = localStorage.getItem('pf_token');
+var CURRENT_USER = null;
+
+function getApiBase() {
+  var meta = document.querySelector('meta[name="api-base"]');
+  return meta ? meta.getAttribute('content') : '/api';
+}
+
+function isLoggedIn() { return !!AUTH_TOKEN; }
+
+function toggleDropdown(e) {
+  e.stopPropagation();
+  var dd = document.getElementById('userDropdown');
+  dd.classList.toggle('show');
+}
+document.addEventListener('click', function() {
+  var dd = document.getElementById('userDropdown');
+  if (dd) dd.classList.remove('show');
+});
+
+function showLoginForm() {
+  document.getElementById('loginForm').style.display = 'block';
+  document.getElementById('registerForm').style.display = 'none';
+  document.getElementById('loginError').style.display = 'none';
+  document.getElementById('regError').style.display = 'none';
+}
+
+function showRegisterForm() {
+  document.getElementById('loginForm').style.display = 'none';
+  document.getElementById('registerForm').style.display = 'block';
+  document.getElementById('loginError').style.display = 'none';
+  document.getElementById('regError').style.display = 'none';
+}
+
+function openAuthModal(form) {
+  document.getElementById('authOverlay').classList.add('show');
+  if (form === 'register') showRegisterForm();
+  else showLoginForm();
+}
+
+function closeAuthModal() {
+  document.getElementById('authOverlay').classList.remove('show');
+}
+
+function showAuthError(id, msg) {
+  var el = document.getElementById(id);
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+function handleLogin() {
+  var email = document.getElementById('loginEmail').value.trim();
+  var password = document.getElementById('loginPassword').value;
+  if (!email || !password) { showAuthError('loginError', '请填写邮箱和密码'); return; }
+
+  var btn = document.querySelector('#loginForm .btn-primary');
+  btn.textContent = '登录中...'; btn.disabled = true;
+
+  fetch(getApiBase() + '/auth?action=login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: email, password: password })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (data.token) {
+      AUTH_TOKEN = data.token;
+      CURRENT_USER = data.user;
+      localStorage.setItem('pf_token', data.token);
+      localStorage.setItem('pf_user', JSON.stringify(data.user));
+      closeAuthModal();
+      updateAuthUI();
+      showToast('登录成功！欢迎回来');
+    } else {
+      showAuthError('loginError', data.error || '登录失败');
+    }
+  })
+  .catch(function() { showAuthError('loginError', '网络错误，请稍后重试'); })
+  .finally(function() { btn.textContent = '登录'; btn.disabled = false; });
+}
+
+function handleRegister() {
+  var email = document.getElementById('regEmail').value.trim();
+  var password = document.getElementById('regPassword').value;
+  var name = document.getElementById('regName').value.trim();
+  if (!email || !password) { showAuthError('regError', '请填写邮箱和密码'); return; }
+  if (password.length < 6) { showAuthError('regError', '密码至少 6 位'); return; }
+
+  var btn = document.querySelector('#registerForm .btn-primary');
+  btn.textContent = '注册中...'; btn.disabled = true;
+
+  fetch(getApiBase() + '/auth?action=register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: email, password: password, name: name })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (data.success) {
+      closeAuthModal();
+      showToast('注册成功！请登录');
+      // Pre-fill email in login form
+      document.getElementById('loginEmail').value = email;
+      showLoginForm();
+    } else {
+      showAuthError('regError', data.error || '注册失败');
+    }
+  })
+  .catch(function() { showAuthError('regError', '网络错误，请稍后重试'); })
+  .finally(function() { btn.textContent = '免费注册'; btn.disabled = false; });
+}
+
+function handleLogout() {
+  AUTH_TOKEN = null;
+  CURRENT_USER = null;
+  localStorage.removeItem('pf_token');
+  localStorage.removeItem('pf_user');
+  updateAuthUI();
+  showToast('已退出登录');
+}
+
+function updateAuthUI() {
+  var authNav = document.getElementById('authNav');
+  var userNav = document.getElementById('userNav');
+  if (!authNav || !userNav) return;
+
+  if (AUTH_TOKEN && CURRENT_USER) {
+    authNav.style.display = 'none';
+    userNav.style.display = 'flex';
+    userNav.style.alignItems = 'center';
+    userNav.style.gap = '12px';
+    document.getElementById('userName').textContent = CURRENT_USER.name || '用户';
+    document.getElementById('userAvatar').textContent = (CURRENT_USER.name || 'U')[0].toUpperCase();
+    var used = CURRENT_USER.generations_used || 0;
+    var limit = CURRENT_USER.generations_limit || 3;
+    document.getElementById('usageCount').textContent = used;
+    document.getElementById('usageLimit').textContent = limit;
+    document.getElementById('dropUsage').textContent = used + '/' + limit;
+    document.getElementById('dropPlan').textContent = CURRENT_USER.subscription_plan || '免费';
+  } else {
+    authNav.style.display = 'block';
+    userNav.style.display = 'none';
+  }
+}
+
+// Check stored auth on load
+function checkStoredAuth() {
+  var token = localStorage.getItem('pf_token');
+  var userStr = localStorage.getItem('pf_user');
+  if (token && userStr) {
+    AUTH_TOKEN = token;
+    CURRENT_USER = JSON.parse(userStr);
+    // Verify token is still valid
+    fetch(getApiBase() + '/auth?action=me', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.user) {
+        CURRENT_USER = data.user;
+        localStorage.setItem('pf_user', JSON.stringify(data.user));
+        updateAuthUI();
+      } else {
+        // Token expired
+        handleLogout();
+      }
+    })
+    .catch(function() {
+      // Offline — use cached user data
+      updateAuthUI();
+    });
+  } else {
+    updateAuthUI();
+  }
+}
+
+// Add auth button to nav
+function addAuthButton() {
+  var authNav = document.getElementById('authNav');
+  if (authNav) {
+    var loginBtn = document.createElement('button');
+    loginBtn.className = 'nav-cta';
+    loginBtn.style.background = 'var(--surface2)';
+    loginBtn.style.border = '1px solid var(--border)';
+    loginBtn.textContent = '登录 / 注册';
+    loginBtn.onclick = function() { openAuthModal('login'); };
+    authNav.parentNode.insertBefore(loginBtn, authNav);
+  }
+}
+
+// ============================================================
+console.log('Auth system loaded');
 </script>
 </body>
 </html>
