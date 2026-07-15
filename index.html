@@ -281,7 +281,7 @@
   <div class="pricing-grid">
     <div class="pricing-card">
       <h3>Starter</h3><p class="sub">适合个人试水</p>
-      <div class="price">$19 <span>/月</span></div>
+      <div class="price">¥19.90 <span>/月</span></div>
       <ul>
         <li>50 次 AI 高质量生成</li>
         <li>高清无水印导出 (2K)</li>
@@ -290,11 +290,11 @@
         <li>社区模板访问</li>
       </ul>
       <button class="btn-primary" data-plan="starter">开始试用</button>
-      <p class="total">按年付 $190，省 17%</p>
+      <p class="total">按年付 ¥190，省 17%</p>
     </div>
     <div class="pricing-card featured">
       <h3>Creator Pro</h3><p class="sub">最适合创作者</p>
-      <div class="price">$49 <span>/月</span></div>
+      <div class="price">¥49.90 <span>/月</span></div>
       <ul>
         <li>200 次 AI 高质量生成</li>
         <li>4K 超高清导出</li>
@@ -304,11 +304,11 @@
         <li>优先级生成队列</li>
       </ul>
       <button class="btn-primary" data-plan="creator">立即订阅</button>
-      <p class="total">按年付 $490，省 17%</p>
+      <p class="total">按年付 ¥490，省 17%</p>
     </div>
     <div class="pricing-card">
       <h3>Enterprise</h3><p class="sub">适合团队和代理</p>
-      <div class="price">$149 <span>/月</span></div>
+      <div class="price">¥149.90 <span>/月</span></div>
       <ul>
         <li>无限 AI 生成</li>
         <li>8K 超高清导出</li>
@@ -318,7 +318,7 @@
         <li>VIP 客服 + 1对1 onboarding</li>
       </ul>
       <button class="btn-primary" data-plan="enterprise">联系销售</button>
-      <p class="total">按年付 $1,490，省 17%</p>
+      <p class="total">按年付 ¥1,490，省 17%</p>
     </div>
   </div>
 </section>
@@ -516,9 +516,14 @@ function closeModal() { document.getElementById('modalOverlay').classList.remove
 // ============================================================
 // STRIPE CHECKOUT
 // ============================================================
+var alipayPollTimer = null;
+
 function handleCheckout(plan) {
   var meta = document.querySelector('meta[name="api-base"]');
   var apiBase = meta ? meta.getAttribute('content') : '/api';
+
+  showToast('正在创建支付订单...');
+
   fetch(apiBase + '/checkout', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -526,10 +531,86 @@ function handleCheckout(plan) {
   })
   .then(function(r){ return r.json(); })
   .then(function(data){
-    if (data.url) window.location.href = data.url;
-    else showToast('支付系统未配置，部署后即可启用');
+    if (data.qrCode) {
+      showAlipayModal(data.qrCode, data.totalAmount, data.planName, data.outTradeNo, data.pollUrl, data.isDevMode, data.devPayUrl);
+    } else {
+      showToast(data.error || '创建订单失败');
+    }
   })
-  .catch(function(){ showToast('支付系统未配置，部署后即可启用'); });
+  .catch(function(){ showToast('网络错误，请稍后重试'); });
+}
+
+function showAlipayModal(qrCodeUrl, amount, planName, tradeNo, pollUrl, isDevMode, devPayUrl) {
+  var overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'alipayModal';
+  overlay.innerHTML = '<div class="modal" style="max-width:420px;text-align:center;padding:32px">' +
+    '<button class="close-icon" onclick="closeAlipayModal()">&#x2715;</button>' +
+    '<div style="font-size:48px;margin-bottom:12px">&#x1F4B0;</div>' +
+    '<h2 style="font-size:22px;font-weight:700;margin-bottom:4px">支付宝扫码支付</h2>' +
+    '<p class="sub" style="color:var(--text2);font-size:14px;margin-bottom:24px">请打开支付宝扫一扫完成支付</p>' +
+    '<div style="background:white;border-radius:12px;padding:16px;display:inline-block;margin-bottom:16px">' +
+      '<img src="' + qrCodeUrl + '" style="width:240px;height:240px;display:block" alt="支付二维码" id="alipayQR">' +
+    '</div>' +
+    '<div style="font-size:28px;font-weight:800;color:var(--accent2);margin-bottom:8px">' +
+      '&yen; <span id="alipayAmount">' + amount.toFixed(2) + '</span>' +
+    '</div>' +
+    '<div style="font-size:14px;color:var(--text2);margin-bottom:16px">' + planName + '</div>' +
+    '<div id="alipayStatus" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:10px 16px;background:var(--surface2);border-radius:8px;font-size:13px;color:var(--text2)">' +
+      '<div class="spinner"></div><span>等待支付...</span>' +
+    '</div>' +
+    (isDevMode && devPayUrl ? '<div style="margin-top:12px;padding:8px;background:rgba(253,121,168,0.1);border-radius:8px;font-size:12px;color:var(--pink)">开发模式：<a href="' + devPayUrl + '" target="_blank" style="color:var(--accent2)">点击模拟支付</a></div>' : '') +
+    '<p style="font-size:12px;color:var(--text3);margin-top:16px">二维码有效期为 30 分钟，支付后自动生效</p>' +
+  '</div>';
+  document.body.appendChild(overlay);
+  setTimeout(function(){ overlay.classList.add('show'); }, 50);
+
+  // 开始轮询支付状态
+  startPolling(tradeNo, pollUrl);
+}
+
+function closeAlipayModal() {
+  var modal = document.getElementById('alipayModal');
+  if (modal) {
+    modal.classList.remove('show');
+    setTimeout(function(){ modal.remove(); }, 300);
+  }
+  stopPolling();
+}
+
+function startPolling(tradeNo, pollUrl) {
+  stopPolling();
+  alipayPollTimer = setInterval(function() {
+    var meta = document.querySelector('meta[name="api-base"]');
+    var apiBase = meta ? meta.getAttribute('content') : '/api';
+    fetch(apiBase + '/check-order?trade_no=' + tradeNo)
+      .then(function(r){ return r.json(); })
+      .then(function(data) {
+        if (data.paid) {
+          stopPolling();
+          var statusEl = document.getElementById('alipayStatus');
+          if (statusEl) {
+            statusEl.innerHTML = '&#x2705; 支付成功！';
+            statusEl.style.color = 'var(--green)';
+            statusEl.style.background = 'rgba(0,206,201,0.1)';
+          }
+          setTimeout(function() {
+            closeAlipayModal();
+            showToast('支付成功！订阅已激活 &#x2705;');
+            // 刷新用户信息
+            if (typeof checkStoredAuth === 'function') checkStoredAuth();
+          }, 1500);
+        }
+      })
+      .catch(function(){});
+  }, 3000);
+}
+
+function stopPolling() {
+  if (alipayPollTimer) {
+    clearInterval(alipayPollTimer);
+    alipayPollTimer = null;
+  }
 }
 
 // ============================================================

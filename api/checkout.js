@@ -1,19 +1,32 @@
-// Vercel Serverless Function — Stripe Checkout
-// Cost: free to start, 2.9% + $0.30 per transaction
+// Vercel Serverless Function — 支付宝当面付
+// 用户点击购买 → 后端生成付款二维码 → 用户支付宝扫码支付
 //
-// Mode 1 (default): Creates products on the fly via price_data — no setup needed
-// Mode 2 (advanced): Use pre-created Stripe Price IDs via env vars for production
+// 环境变量 (Vercel)：
+//   ALIPAY_APP_ID       — 必填，支付宝应用 ID
+//   ALIPAY_PRIVATE_KEY  — 必填，商户 RSA2 私钥
+//   ALIPAY_PUBLIC_KEY   — 建议配置，用于验证回调签名
+//   ALIPAY_NOTIFY_URL   — 可选，回调通知 URL
+//
+// 未配置时自动进入开发模式（显示模拟二维码）
 
-import Stripe from 'stripe';
+import { createAlipayQRCode, queryAlipayOrder } from './_alipay.js';
 
-// Price definitions — edit amounts here
+// 价格定义 (人民币 元)
 const PLANS = {
-  starter:   { name: 'Starter',     price: 1900, desc: '50 次 AI 生成/月' },
-  creator:   { name: 'Creator Pro', price: 4900, desc: '200 次 AI 生成/月' },
-  enterprise:{ name: 'Enterprise',  price: 14900, desc: '无限 AI 生成/月' },
+  starter:   { name: '基础版',  price: 19.90, unit: '元', desc: '50 次 AI 生成/月', priceCN: 19.90 },
+  creator:   { name: '专业版',  price: 49.90, unit: '元', desc: '200 次 AI 生成/月', priceCN: 49.90 },
+  enterprise:{ name: '企业版',  price: 149.90, unit: '元', desc: '无限 AI 生成/月', priceCN: 149.90 },
 };
 
+// 生成唯一订单号
+function generateOrderId() {
+  const ts = Date.now().toString(36);
+  const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
+  return `PF${ts}${rand}`;
+}
+
 export default async function handler(req, res) {
+  // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -22,48 +35,36 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
-    const stripeKey = process.env.STRIPE_SECRET_KEY;
-    if (!stripeKey) return res.status(500).json({ error: 'Stripe 未配置，请在 Vercel 环境变量中设置 STRIPE_SECRET_KEY' });
-
-    const stripe = Stripe(stripeKey);
-    const { plan, email } = req.body || {};
+    const { plan } = req.body || {};
     const selected = PLANS[plan];
     if (!selected) return res.status(400).json({ error: '无效的套餐' });
 
-    // Check for pre-created Stripe Price ID (production mode)
-    const priceIdKey = `PRICE_ID_${plan.toUpperCase()}`;
-    const priceId = process.env[priceIdKey];
+    const outTradeNo = generateOrderId();
+    const subject = `PixelForge AI - ${selected.name}套餐`;
 
-    const lineItems = priceId
-      ? [{ price: priceId, quantity: 1 }]
-      : [{
-          price_data: {
-            currency: 'usd',
-            product_data: {
-              name: selected.name,
-              description: selected.desc,
-            },
-            unit_amount: selected.price,
-            recurring: { interval: 'month' },
-          },
-          quantity: 1,
-        }];
-
-    const origin = req.headers.origin || 'https://pixelforge-ai.vercel.app';
-
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
-      line_items: lineItems,
-      mode: 'subscription',
-      ...(email && { customer_email: email }),
-      success_url: `${origin}/?success=true&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/?canceled=true`,
-      metadata: { plan },
+    // 调用支付宝 API 生成二维码
+    const result = await createAlipayQRCode({
+      subject,
+      totalAmount: selected.price,
+      outTradeNo,
     });
 
-    res.status(200).json({ url: session.url, sessionId: session.id });
+    res.status(200).json({
+      qrCode: result.qrCode,
+      outTradeNo: result.outTradeNo,
+      plan,
+      planName: selected.name,
+      totalAmount: selected.price,
+      isDevMode: result.isDevMode || false,
+      devPayUrl: result.devPayUrl || null,
+      // 返回订单信息供前端轮询
+      pollUrl: `/api/check-order?trade_no=${result.outTradeNo}`,
+    });
   } catch (err) {
     console.error('Checkout error:', err);
-    res.status(500).json({ error: err.message || '创建支付会话失败' });
+    res.status(500).json({ error: err.message || '创建支付订单失败' });
   }
 }
+
+// 导出价格信息供前端使用
+export { PLANS, generateOrderId };

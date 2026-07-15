@@ -117,58 +117,97 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // ===== Stripe Checkout =====
+  // ===== 支付宝当面付 =====
   if (pathname === '/api/checkout' && req.method === 'POST') {
-    const stripeKey = process.env.STRIPE_SECRET_KEY;
-    if (!stripeKey) {
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      return res.end(JSON.stringify({ error: 'Stripe 未配置' }));
-    }
-
     try {
-      const { Stripe } = await import('stripe');
-      const stripe = Stripe(stripeKey);
+      const { createAlipayQRCode } = await import('./api/_alipay.js');
       const { plan } = await parseBody(req);
 
       const plans = {
-        starter: { name: 'Starter', price: 1900, desc: '50 次 AI 生成/月' },
-        creator: { name: 'Creator Pro', price: 4900, desc: '200 次 AI 生成/月' },
-        enterprise: { name: 'Enterprise', price: 14900, desc: '无限 AI 生成/月' }
+        starter:   { name: '基础版',  price: 19.90 },
+        creator:   { name: '专业版',  price: 49.90 },
+        enterprise:{ name: '企业版',  price: 149.90 },
       };
 
       const selected = plans[plan];
       if (!selected) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        return res.end(JSON.stringify({ error: '无效的套餐' }));
+        res.writeHead(400, { "Content-Type": "application/json" });
+        return res.end(JSON.stringify({ error: "无效的套餐" }));
       }
 
-      const session = await stripe.checkout.sessions.create({
-        payment_method_types: ['card'],
-        line_items: [{
-          price_data: {
-            currency: 'usd',
-            product_data: {
-              name: selected.name,
-              description: selected.desc,
-            },
-            unit_amount: selected.price,
-            recurring: { interval: 'month' },
-          },
-          quantity: 1,
-        }],
-        mode: 'subscription',
-        success_url: `http://localhost:${PORT}/?success=true`,
-        cancel_url: `http://localhost:${PORT}/?canceled=true`,
-        metadata: { plan },
+      const outTradeNo = "PF" + Date.now().toString(36) + Math.random().toString(36).slice(2,6).toUpperCase();
+      const result = await createAlipayQRCode({
+        subject: "PixelForge AI - " + selected.name + "套餐",
+        totalAmount: selected.price,
+        outTradeNo,
       });
 
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ url: session.url, sessionId: session.id }));
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({
+        qrCode: result.qrCode,
+        outTradeNo: result.outTradeNo,
+        plan,
+        planName: selected.name,
+        totalAmount: selected.price,
+        isDevMode: result.isDevMode || false,
+        devPayUrl: result.devPayUrl || null,
+        pollUrl: "/api/check-order?trade_no=" + result.outTradeNo,
+      }));
     } catch (err) {
-      console.error('Checkout error:', err);
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: '创建支付会话失败' }));
+      console.error("Checkout error:", err);
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: err.message || "创建订单失败" }));
     }
+    return;
+  }
+
+  // ===== 查询订单支付状态 =====
+  if (pathname === '/api/check-order' && req.method === 'GET') {
+    try {
+      const tradeNo = url.searchParams.get("trade_no");
+      if (!tradeNo) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        return res.end(JSON.stringify({ error: "缺少订单号" }));
+      }
+      const { getDevOrderStatus } = await import('./api/_alipay.js');
+      const result = getDevOrderStatus(tradeNo);
+      if (!result) {
+        res.writeHead(404, { "Content-Type": "application/json" });
+        return res.end(JSON.stringify({ error: "订单不存在" }));
+      }
+      const paid = result.trade_status === "TRADE_SUCCESS" || result.trade_status === "TRADE_FINISHED";
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({
+        tradeNo: result.out_trade_no,
+        tradeStatus: result.trade_status,
+        paid,
+        totalAmount: result.total_amount,
+      }));
+    } catch (err) {
+      console.error("Query order error:", err);
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "查询订单失败" }));
+    }
+    return;
+  }
+
+  // ===== 开发模式：模拟支付页面 =====
+  if (pathname === '/api/alipay-mock') {
+    const tradeNo = url.searchParams.get("trade_no");
+    const amount = url.searchParams.get("amount");
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    const mockFile = path.join(__dirname, "mock-pay.html");
+    let mockContent = fs.readFileSync(mockFile, "utf-8");
+    return res.end(mockContent);
+  }
+
+  // ===== 开发模式：模拟支付成功 =====
+  if (pathname === '/api/mock-pay') {
+    const tradeNo = url.searchParams.get("trade_no");
+    const { mockDevPaymentSuccess } = await import('./api/_alipay.js');
+    const ok = mockDevPaymentSuccess(tradeNo);
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ ok }));
     return;
   }
 
@@ -247,42 +286,6 @@ const server = http.createServer(async (req, res) => {
 
     res.writeHead(400, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({ error: '无效的请求' }));
-  }
-
-  // ===== Stripe Webhook =====
-  if (pathname === '/api/webhook' && req.method === 'POST') {
-    const stripeKey = process.env.STRIPE_SECRET_KEY;
-    if (!stripeKey) {
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      return res.end(JSON.stringify({ error: 'Stripe 未配置' }));
-    }
-
-    try {
-      const { Stripe } = await import('stripe');
-      const stripe = Stripe(stripeKey);
-      const body = await parseBody(req);
-      const event = body;
-
-      switch (event.type) {
-        case 'checkout.session.completed':
-          console.log('✅ Checkout completed:', event.data?.object?.id);
-          break;
-        case 'customer.subscription.deleted':
-          console.log('❌ Subscription canceled');
-          break;
-        case 'invoice.payment_succeeded':
-          console.log('💰 Payment received');
-          break;
-      }
-
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ received: true }));
-    } catch (err) {
-      console.error('Webhook error:', err);
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Webhook handler failed' }));
-    }
-    return;
   }
 
   // ===== Static files =====
