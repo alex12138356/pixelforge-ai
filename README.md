@@ -2,13 +2,6 @@
 
 一个可直接商用的 AI 内容创作 SaaS，5 分钟部署上线。
 
-## 目录
-- [一键部署](#一键部署-5分钟)
-- [OpenAI 配置](#2-配置-openai-免费注册)
-- [Stripe 收款配置](#3-配置-stripe-收款-可选)
-- [本地开发测试](#本地开发测试)
-- [变现策略](#变现策略)
-
 ---
 
 ## 一键部署 (5分钟)
@@ -16,11 +9,10 @@
 ### 1. 注册免费账号
 - [Vercel](https://vercel.com) — 用 GitHub 登录
 - [OpenAI](https://platform.openai.com) — 获取 API Key
-- [Stripe](https://dashboard.stripe.com/register) — 注册收款账号 (可选)
+- [支付宝开放平台](https://open.alipay.com) — 注册开发者 (可选，用于收款)
 
 ### 2. 部署
 ```bash
-# 克隆/推送项目到 GitHub
 cd outputs/ai-studio
 git init
 git add .
@@ -37,12 +29,15 @@ git push -u origin main
 |--------|------|------|
 | `OPENAI_API_KEY` | ✅ | OpenAI API Key |
 | `MODEL` | ❌ | 默认 `dall-e-3`，可选 `dall-e-2` (更便宜) |
-| `STRIPE_SECRET_KEY` | ❌ | Stripe Secret Key (开启收款用) |
-| `STRIPE_WEBHOOK_SECRET` | ❌ | Stripe Webhook Secret |
+| `ALIPAY_APP_ID` | ❌ | 支付宝应用 ID (不配则自动走开发模式) |
+| `ALIPAY_PRIVATE_KEY` | ❌ | RSA2 商户私钥 |
+| `ALIPAY_PUBLIC_KEY` | ❌ | 支付宝公钥 |
+| `SUPABASE_URL` | ❌ | Supabase 项目 URL (用户系统) |
+| `SUPABASE_SERVICE_KEY` | ❌ | Supabase 服务端 Key |
 
 ---
 
-## 2. 配置 OpenAI (免费注册)
+## 配置 OpenAI (免费注册)
 
 1. 访问 [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
 2. 点击 **Create new secret key**
@@ -52,43 +47,49 @@ git push -u origin main
 
 ---
 
-## 3. 配置 Stripe 收款 (可选)
+## 配置支付宝当面付 (可选)
 
-### 3.1 注册 Stripe
-1. 访问 [dashboard.stripe.com/register](https://dashboard.stripe.com/register)
-2. 填写邮箱、密码、公司信息
-3. 进入 Dashboard
+不配置支付宝也能用——系统会自动进入**开发模式**，显示模拟支付二维码，点一下就算付款成功。方便本地测试和展示。
 
-### 3.2 获取 API Key
-1. Stripe Dashboard → **Developers** → **API Keys**
-2. 复制 **Secret Key** (以 `sk_live_` 开头)
-3. 添加到 Vercel 环境变量 `STRIPE_SECRET_KEY`
+正式上线需要以下步骤：
 
-### 3.3 (可选) 创建固定产品
-默认模式会自动在 Stripe 创建产品。如需固定 Price ID：
-1. Stripe Dashboard → **Products** → **Add Product**
-2. 分别创建三个产品：
-   - **Starter** — $19/月，50 次 AI 生成
-   - **Creator Pro** — $49/月，200 次 AI 生成
-   - **Enterprise** — $149/月，无限 AI 生成
-3. 每个产品创建后，复制对应的 **Price ID** (以 `price_` 开头)
-4. 添加到 Vercel 环境变量：
-   - `PRICE_ID_STARTER` = `price_xxxxx`
-   - `PRICE_ID_CREATOR` = `price_xxxxx`
-   - `PRICE_ID_ENTERPRISE` = `price_xxxxx`
+### 1. 注册支付宝开放平台
+打开 [open.alipay.com](https://open.alipay.com)，用支付宝扫码登录。
 
-### 3.4 配置 Webhook (接收付款通知)
-1. Stripe Dashboard → **Developers** → **Webhooks** → **Add endpoint**
-2. **Endpoint URL:** `https://你的域名.vercel.app/api/webhook`
-3. **监听事件:**
-   - `checkout.session.completed`
-   - `customer.subscription.updated`
-   - `customer.subscription.deleted`
-   - `invoice.payment_succeeded`
-   - `invoice.payment_failed`
-4. 点击 **Add endpoint**
-5. 复制 **Signing secret** (以 `whsec_` 开头)
-6. 添加到 Vercel 环境变量 `STRIPE_WEBHOOK_SECRET`
+### 2. 创建网页应用
+1. 进入 **控制台 → 网页/移动应用**
+2. 点击 **创建应用** → **网页应用**
+3. 填写应用名称（如"PixelForge AI"），上传应用图标
+4. 创建完成后，获取 **App ID**（以 `202100` 开头）
+
+### 3. 设置接口加签方式（RSA2）
+1. 在应用详情页找到 **接口加签方式** → **设置**
+2. 在本地生成 RSA2 密钥对：
+
+   ```bash
+   # 生成私钥
+   openssl genrsa -out alipay_private.pem 2048
+   
+   # 导出公钥
+   openssl rsa -in alipay_private.pem -pubout -out alipay_public.pem
+   ```
+
+3. 复制 `alipay_public.pem` 的内容粘贴到支付宝开放平台
+4. 支付宝会返回它的 **支付宝公钥**，保存好
+5. 设置应用网关（部署到 Vercel 后有域名时设置）
+
+### 4. 添加 Vercel 环境变量
+```
+ALIPAY_APP_ID=202100xxxxxxxxxxxx
+ALIPAY_PRIVATE_KEY=-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----
+ALIPAY_PUBLIC_KEY=-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----
+```
+
+> **注意：** `ALIPAY_PRIVATE_KEY` 中的换行符要用 `\n` 代替，不能直接写多行。或者用 Vercel CLI 的 `vc env add` 命令添加，可以正确传递多行文本。
+
+### 5. 设置回调地址
+1. 部署完成后，在支付宝开放平台的应用设置中
+2. 添加 **授权回调地址**：`https://你的域名.vercel.app/?success=true`
 
 ---
 
@@ -96,18 +97,13 @@ git push -u origin main
 
 ### 前置条件
 ```bash
-# 本地运行需要 Node.js 18+
 cd outputs/ai-studio
 pnpm install   # 或 npm install
 ```
 
 ### 启动开发服务器
 ```bash
-# 设置环境变量
 export OPENAI_API_KEY=sk-your-key-here
-export STRIPE_SECRET_KEY=sk_test_your-key-here  # 可选
-
-# 启动
 node dev-server.js
 # 访问 http://localhost:3000
 ```
@@ -118,20 +114,26 @@ export OPENAI_API_KEY=sk-your-key-here
 node test-generate.js
 ```
 
-测试脚本会：
-1. 验证 API Key 有效性
-2. 调用 DALL-E 3 生成一张测试图片
-3. 验证图片可访问
+### 测试支付宝支付流程
+1. 启动开发服务器
+2. 打开 `http://localhost:3000`
+3. 点击任意定价方案的"立即订阅"
+4. 弹窗显示支付宝付款二维码（开发模式）
+5. 点击弹窗中的"模拟支付"链接
+6. 在新页面点击"模拟支付成功"按钮
+7. 回到原页面，支付成功 ✅
 
 ---
 
-## 技术栈
-- 前端: 纯 HTML/CSS/JS (零依赖)
-- API: Vercel Serverless Functions (Node.js 18+)
-- AI: OpenAI DALL-E 3 / DALL-E 2
-- 支付: Stripe
-- 部署: Vercel (免费套餐)
-- 本地开发: Node.js dev-server.js
+## 用户系统 (Supabase)
+
+可选功能。注册 Supabase 后：
+1. 在 SQL Editor 运行 `supabase-schema.sql`
+2. 添加 `SUPABASE_URL` 和 `SUPABASE_SERVICE_KEY` 到 Vercel
+3. 前端会出现登录/注册功能
+4. 用户可管理自己的生成用量和套餐
+
+---
 
 ## 成本结构
 
@@ -139,31 +141,49 @@ node test-generate.js
 |------|------|
 | Vercel 托管 | 免费 |
 | OpenAI API (DALL-E 3) | $0.04/张 |
-| Stripe 支付 | 免费开通，2.9%+$0.30/笔 |
-| 域名 (可选) | $0–$10/年 |
-| **每月最低** | **$0 + 按量付费** |
+| 支付宝支付 | 免费开通，0.6%/笔（国内商家费率） |
+| 域名 (可选) | ¥30–¥80/年 |
+| **每月最低** | **¥0 + 按量付费** |
+
+---
 
 ## 变现策略
 
-### 直接卖订阅 ($19–$149/月)
-- 用户每月付费使用 AI 生成器
-- 参考定价：Starter $19、Creator Pro $49、Enterprise $149
+### 直接卖订阅 (¥19.90–¥149.90/月)
+| 套餐 | 价格 | 说明 |
+|------|------|------|
+| 基础版 | ¥19.90/月 | 50 次 AI 生成 |
+| 专业版 | ¥49.90/月 | 200 次 AI 生成 |
+| 企业版 | ¥149.90/月 | 无限 AI 生成 |
 
-### 卖 AI 生成资产包 ($19–$89/套)
+### 卖 AI 生成资产包 (¥19–¥89/套)
 - 把 AI 生成的作品打包成模板上架
 - 平台：Gumroad、Creative Market、Etsy
 
-### 代运营服务 ($500–$3000/月)
+### 代运营服务 (¥500–¥3000/月)
 - 用这个工具为客户批量生产内容
 - 收服务费，成本几乎为零
 
-## 盈利测算 (假设 Creator Pro $49/月)
+---
+
+## 盈利测算 (假设专业版 ¥49.90/月)
 
 | 客户数 | 月收入 | 月成本 (API) | 利润 |
 |--------|--------|-------------|------|
-| 1 | $49 | ~$2 | **$47** |
-| 10 | $490 | ~$20 | **$470** |
-| 50 | $2,450 | ~$100 | **$2,350** |
-| 100 | $4,900 | ~$200 | **$4,700** |
+| 1 | ¥49.90 | ~¥0.30 | **¥49.60** |
+| 10 | ¥499 | ~¥3 | **¥496** |
+| 50 | ¥2,495 | ~¥15 | **¥2,480** |
+| 100 | ¥4,990 | ~¥30 | **¥4,960** |
 
 第一个客户就回本。
+
+---
+
+## 技术栈
+- 前端: 纯 HTML/CSS/JS (零依赖)
+- API: Vercel Serverless Functions (Node.js 18+)
+- AI: OpenAI DALL-E 3 / DALL-E 2
+- 支付: 支付宝当面付 (开发模式无需配置)
+- 用户系统: Supabase (可选)
+- 部署: Vercel (免费套餐)
+- 本地开发: Node.js dev-server.js
