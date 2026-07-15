@@ -9,7 +9,7 @@
 ### 1. 注册免费账号
 - [Vercel](https://vercel.com) — 用 GitHub 登录
 - [OpenAI](https://platform.openai.com) — 获取 API Key
-- [支付宝开放平台](https://open.alipay.com) — 注册开发者 (可选，用于收款)
+- [PayJS开放平台](https://open.alipay.com) — 注册开发者 (可选，用于收款)
 
 ### 2. 部署
 ```bash
@@ -29,9 +29,9 @@ git push -u origin main
 |--------|------|------|
 | `OPENAI_API_KEY` | ✅ | OpenAI API Key |
 | `MODEL` | ❌ | 默认 `dall-e-3`，可选 `dall-e-2` (更便宜) |
-| `ALIPAY_APP_ID` | ❌ | 支付宝应用 ID (不配则自动走开发模式) |
+| `ALIPAY_APP_ID` | ❌ | PayJS应用 ID (不配则自动走开发模式) |
 | `ALIPAY_PRIVATE_KEY` | ❌ | RSA2 商户私钥 |
-| `ALIPAY_PUBLIC_KEY` | ❌ | 支付宝公钥 |
+| `ALIPAY_PUBLIC_KEY` | ❌ | PayJS公钥 |
 | `SUPABASE_URL` | ❌ | Supabase 项目 URL (用户系统) |
 | `SUPABASE_SERVICE_KEY` | ❌ | Supabase 服务端 Key |
 
@@ -47,49 +47,27 @@ git push -u origin main
 
 ---
 
-## 配置支付宝当面付 (可选)
+## 配置 PayJS 支付 (可选)
 
-不配置支付宝也能用——系统会自动进入**开发模式**，显示模拟支付二维码，点一下就算付款成功。方便本地测试和展示。
+不配置 PayJS 也能用——系统会自动进入**开发模式**，显示模拟支付二维码，点一下就算付款成功。
 
 正式上线需要以下步骤：
 
-### 1. 注册支付宝开放平台
-打开 [open.alipay.com](https://open.alipay.com)，用支付宝扫码登录。
+### 1. 注册 PayJS
+打开 [payjs.cn](https://payjs.cn)，用微信扫码注册。
 
-### 2. 创建网页应用
-1. 进入 **控制台 → 网页/移动应用**
-2. 点击 **创建应用** → **网页应用**
-3. 填写应用名称（如"PixelForge AI"），上传应用图标
-4. 创建完成后，获取 **App ID**（以 `202100` 开头）
+### 2. 获取商户号
+注册完成后，在后台找到：
+- **商户号 (MCHID)** — 一串数字
+- **商户密钥 (Key)** — 一串字符串
 
-### 3. 设置接口加签方式（RSA2）
-1. 在应用详情页找到 **接口加签方式** → **设置**
-2. 在本地生成 RSA2 密钥对：
-
-   ```bash
-   # 生成私钥
-   openssl genrsa -out alipay_private.pem 2048
-   
-   # 导出公钥
-   openssl rsa -in alipay_private.pem -pubout -out alipay_public.pem
-   ```
-
-3. 复制 `alipay_public.pem` 的内容粘贴到支付宝开放平台
-4. 支付宝会返回它的 **支付宝公钥**，保存好
-5. 设置应用网关（部署到 Vercel 后有域名时设置）
-
-### 4. 添加 Vercel 环境变量
+### 3. 添加 Vercel 环境变量
 ```
-ALIPAY_APP_ID=202100xxxxxxxxxxxx
-ALIPAY_PRIVATE_KEY=-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----
-ALIPAY_PUBLIC_KEY=-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----
+PAYJS_MCHID=你的商户号
+PAYJS_KEY=你的商户密钥
 ```
 
-> **注意：** `ALIPAY_PRIVATE_KEY` 中的换行符要用 `\n` 代替，不能直接写多行。或者用 Vercel CLI 的 `vc env add` 命令添加，可以正确传递多行文本。
-
-### 5. 设置回调地址
-1. 部署完成后，在支付宝开放平台的应用设置中
-2. 添加 **授权回调地址**：`https://你的域名.vercel.app/?success=true`
+PayJS 支持支付宝和微信扫码支付，费率约 0.38%-1.5%，提现到个人支付宝或微信。
 
 ---
 
@@ -114,11 +92,11 @@ export OPENAI_API_KEY=sk-your-key-here
 node test-generate.js
 ```
 
-### 测试支付宝支付流程
+### 测试PayJS支付流程
 1. 启动开发服务器
 2. 打开 `http://localhost:3000`
 3. 点击任意定价方案的"立即订阅"
-4. 弹窗显示支付宝付款二维码（开发模式）
+4. 弹窗显示支付二维码（开发模式）
 5. 点击弹窗中的"模拟支付"链接
 6. 在新页面点击"模拟支付成功"按钮
 7. 回到原页面，支付成功 ✅
@@ -141,7 +119,7 @@ node test-generate.js
 |------|------|
 | Vercel 托管 | 免费 |
 | OpenAI API (DALL-E 3) | $0.04/张 |
-| 支付宝支付 | 免费开通，0.6%/笔（国内商家费率） |
+| PayJS支付 | 免费开通，0.6%/笔（国内商家费率） |
 | 域名 (可选) | ¥30–¥80/年 |
 | **每月最低** | **¥0 + 按量付费** |
 
@@ -183,7 +161,7 @@ node test-generate.js
 - 前端: 纯 HTML/CSS/JS (零依赖)
 - API: Vercel Serverless Functions (Node.js 18+)
 - AI: OpenAI DALL-E 3 / DALL-E 2
-- 支付: 支付宝当面付 (开发模式无需配置)
+- 支付: PayJS (开发模式无需配置)
 - 用户系统: Supabase (可选)
 - 部署: Vercel (免费套餐)
 - 本地开发: Node.js dev-server.js

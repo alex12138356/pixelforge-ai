@@ -120,7 +120,7 @@ const server = http.createServer(async (req, res) => {
   // ===== 支付宝当面付 =====
   if (pathname === '/api/checkout' && req.method === 'POST') {
     try {
-      const { createAlipayQRCode } = await import('./api/_alipay.js');
+      const { createPayJSOrder } = await import('./api/_payjs.js');
       const { plan } = await parseBody(req);
 
       const plans = {
@@ -136,7 +136,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       const outTradeNo = "PF" + Date.now().toString(36) + Math.random().toString(36).slice(2,6).toUpperCase();
-      const result = await createAlipayQRCode({
+      const result = await createPayJSOrder({
         subject: "PixelForge AI - " + selected.name + "套餐",
         totalAmount: selected.price,
         outTradeNo,
@@ -169,7 +169,7 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(400, { "Content-Type": "application/json" });
         return res.end(JSON.stringify({ error: "缺少订单号" }));
       }
-      const { getDevOrderStatus } = await import('./api/_alipay.js');
+      const { getDevOrderStatus } = await import('./api/_payjs.js');
       const result = getDevOrderStatus(tradeNo);
       if (!result) {
         res.writeHead(404, { "Content-Type": "application/json" });
@@ -192,7 +192,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   // ===== 开发模式：模拟支付页面 =====
-  if (pathname === '/api/alipay-mock') {
+  if (pathname === '/api/mock-pay-page') {
     const tradeNo = url.searchParams.get("trade_no");
     const amount = url.searchParams.get("amount");
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
@@ -204,8 +204,8 @@ const server = http.createServer(async (req, res) => {
   // ===== 开发模式：模拟支付成功 =====
   if (pathname === '/api/mock-pay') {
     const tradeNo = url.searchParams.get("trade_no");
-    const { mockDevPaymentSuccess } = await import('./api/_alipay.js');
-    const ok = mockDevPaymentSuccess(tradeNo);
+    const { mockPaySuccess } = await import('./api/_payjs.js');
+    const ok = mockPaySuccess(tradeNo);
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ ok }));
     return;

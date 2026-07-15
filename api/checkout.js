@@ -1,24 +1,21 @@
-// Vercel Serverless Function — 支付宝当面付
-// 用户点击购买 → 后端生成付款二维码 → 用户支付宝扫码支付
+// Vercel Serverless Function — PayJS 扫码支付
+// 用户点击购买 → 后端生成付款二维码 → 用户扫码支付
 //
-// 环境变量 (Vercel)：
-//   ALIPAY_APP_ID       — 必填，支付宝应用 ID
-//   ALIPAY_PRIVATE_KEY  — 必填，商户 RSA2 私钥
-//   ALIPAY_PUBLIC_KEY   — 建议配置，用于验证回调签名
-//   ALIPAY_NOTIFY_URL   — 可选，回调通知 URL
+// 环境变量：
+//   PAYJS_MCHID  — 商户号 (在 payjs.cn 后台获取)
+//   PAYJS_KEY    — 商户密钥
 //
 // 未配置时自动进入开发模式（显示模拟二维码）
 
-import { createAlipayQRCode, queryAlipayOrder } from './_alipay.js';
+import { createPayJSOrder, queryPayJSOrder } from './_payjs.js';
 
 // 价格定义 (人民币 元)
 const PLANS = {
-  starter:   { name: '基础版',  price: 19.90, unit: '元', desc: '50 次 AI 生成/月', priceCN: 19.90 },
-  creator:   { name: '专业版',  price: 49.90, unit: '元', desc: '200 次 AI 生成/月', priceCN: 49.90 },
-  enterprise:{ name: '企业版',  price: 149.90, unit: '元', desc: '无限 AI 生成/月', priceCN: 149.90 },
+  starter:   { name: '基础版',  priceCN: 19.90, fee: 1990, desc: '50 次 AI 生成/月' },
+  creator:   { name: '专业版',  priceCN: 49.90, fee: 4990, desc: '200 次 AI 生成/月' },
+  enterprise:{ name: '企业版',  priceCN: 149.90, fee: 14990, desc: '无限 AI 生成/月' },
 };
 
-// 生成唯一订单号
 function generateOrderId() {
   const ts = Date.now().toString(36);
   const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
@@ -26,7 +23,6 @@ function generateOrderId() {
 }
 
 export default async function handler(req, res) {
-  // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -40,24 +36,25 @@ export default async function handler(req, res) {
     if (!selected) return res.status(400).json({ error: '无效的套餐' });
 
     const outTradeNo = generateOrderId();
-    const subject = `PixelForge AI - ${selected.name}套餐`;
+    const body = `PixelForge AI - ${selected.name}套餐`;
 
-    // 调用支付宝 API 生成二维码
-    const result = await createAlipayQRCode({
-      subject,
-      totalAmount: selected.price,
+    // 调用 PayJS API 生成二维码
+    const result = await createPayJSOrder({
+      totalFee: selected.fee,
       outTradeNo,
+      body,
+      notifyUrl: process.env.PAYJS_NOTIFY_URL || `${req.headers.origin || 'https://pixelforge-ai.vercel.app'}/api/check-order`,
     });
 
     res.status(200).json({
       qrCode: result.qrCode,
+      payjsOrderId: result.payjsOrderId,
       outTradeNo: result.outTradeNo,
       plan,
       planName: selected.name,
-      totalAmount: selected.price,
+      totalAmount: selected.priceCN,
       isDevMode: result.isDevMode || false,
       devPayUrl: result.devPayUrl || null,
-      // 返回订单信息供前端轮询
       pollUrl: `/api/check-order?trade_no=${result.outTradeNo}`,
     });
   } catch (err) {
@@ -66,5 +63,4 @@ export default async function handler(req, res) {
   }
 }
 
-// 导出价格信息供前端使用
-export { PLANS, generateOrderId };
+export { PLANS };

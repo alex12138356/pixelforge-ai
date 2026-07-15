@@ -9,8 +9,9 @@
     "deploy": "echo 'Deploy to Vercel from GitHub repo'"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.0.0",
     "stripe": "^17.0.0",
-    "@supabase/supabase-js": "^2.0.0"
+    "vercel": "^56.1.0"
   },
   "engines": {
     "node": ">=18.0.0"
