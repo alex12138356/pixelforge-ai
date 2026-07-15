@@ -27,7 +27,7 @@ export default async function handler(req, res) {
 
     res.status(200).json({
       paid: result.paid,
-      status: result.status,
+      status: result.rawStatus,
       totalFee: result.totalFee,
       outTradeNo: result.outTradeNo,
     });

@@ -7,7 +7,7 @@
 //
 // 未配置时自动进入开发模式（显示模拟二维码）
 
-import { createXorPayOrder, queryXorPayOrder } from './_xorpay.js';
+import { createXorPayOrder } from './_xorpay.js';
 
 // 价格定义 (人民币 元)
 const PLANS = {
@@ -39,7 +39,8 @@ export default async function handler(req, res) {
     const body = `PixelForge AI - ${selected.name}套餐`;
 
     // 调用 PayJS API 生成二维码
-    const result = await createXorPayOrder({
+    // 创建支付宝支付二维码
+      const result = await createXorPayOrder({
       totalFee: selected.priceCN,
       outTradeNo,
       body: body,
@@ -48,7 +49,7 @@ export default async function handler(req, res) {
 
     res.status(200).json({
       qrCode: result.qrCode,
-      payjsOrderId: result.payjsOrderId,
+      orderId: result.orderId,
       outTradeNo: result.outTradeNo,
       plan,
       planName: selected.name,
